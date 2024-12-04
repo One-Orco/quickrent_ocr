@@ -1,21 +1,47 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
+from typing import Dict, Literal
 import os
-import re
-import cv2
-import numpy as np
 import pytesseract
-from typing import Dict, Union
-from collections import Counter
-from app.utils.ocr import preprocess_image, beautify_extracted_text
-from app.utils.beautify import beautify_id_card,beautify_title_deed
+from app.utils.ocr import beautify_extracted_text
+from app.utils.preprocessing import preprocess_image
 
 router = APIRouter()
 
-# Define the OCR endpoint
-@router.post("/upload-document/")
-async def upload_document(file: UploadFile = File(...), doc_type: str = "id_card") -> Dict:
+@router.post(
+    "/upload-document/",
+    summary="Upload and Process a Document for OCR",
+    description="""
+This endpoint allows you to upload an image of a document and process it using OCR. 
+It supports both Arabic and English text recognition, applies multiple preprocessing 
+techniques, and returns structured and beautified data depending on the document type.
+
+### Supported `doc_type` Values:
+- `id_card`: For processing ID cards.
+- `title_deed`: For processing title deeds.
+""",
+    response_description="Structured data extracted from the uploaded document."
+)
+async def upload_document(
+    file: UploadFile = File(..., description="The image file to process (JPEG, PNG, or TIFF)."),
+    doc_type: Literal["id_card", "title_deed"] = "id_card"  # Restrict valid values
+) -> Dict:
+    """
+    Upload an image document for OCR processing.
+
+    Parameters:
+    - file: The document image to be processed (JPEG, PNG, TIFF).
+    - doc_type: The type of document being uploaded. Valid values:
+        - `id_card`: For ID cards.
+        - `title_deed`: For title deeds.
+
+    Returns:
+    A structured dictionary containing the extracted and beautified data.
+    """
     if file.content_type not in ["image/jpeg", "image/png", "image/tiff"]:
-        raise HTTPException(status_code=400, detail="Unsupported file type. Please upload a JPEG, PNG, or TIFF image.")
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Please upload a JPEG, PNG, or TIFF image."
+        )
 
     try:
         # Save the uploaded file temporarily
@@ -30,7 +56,7 @@ async def upload_document(file: UploadFile = File(...), doc_type: str = "id_card
 
         for mode in preprocessing_modes:
             processed_image = preprocess_image(temp_file_path, mode)
-            extracted_text = pytesseract.image_to_string(processed_image, lang="eng")
+            extracted_text = pytesseract.image_to_string(processed_image, lang="ara+eng")
             extracted_texts[mode] = extracted_text
             if mode == "blur":
                 blur_text = extracted_text
@@ -45,37 +71,7 @@ async def upload_document(file: UploadFile = File(...), doc_type: str = "id_card
         return beautified_text
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error occurred while processing the file: {str(e)}")
-
-# Image preprocessing function to enhance OCR accuracy
-def preprocess_image(image_path: str, mode: str = "default") -> np.ndarray:
-    image = cv2.imread(image_path)
-
-    # Convert the image to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    if mode == "binary":
-        _, processed_image = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    elif mode == "adaptive":
-        processed_image = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-    elif mode == "blur":
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        _, processed_image = cv2.threshold(blur, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    else:
-        processed_image = gray
-
-    return processed_image
-
-
-
-
-# Beautify extracted text based on document type
-def beautify_extracted_text(text: str, blur_text: str, doc_type: str) -> Dict:
-    if doc_type == "id_card":
-        return beautify_id_card(text, blur_text)
-    elif doc_type == "title_deed":
-        return beautify_title_deed(text)
-    else:
-        return {"raw_text": text}
-
-
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error occurred while processing the file: {str(e)}"
+        )
