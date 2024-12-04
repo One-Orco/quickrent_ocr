@@ -125,19 +125,19 @@ def get_best_name_variation(name_variations: list) -> str:
     most_common_name, _ = counter.most_common(1)[0]
     return most_common_name
 
-
-# Function to select appropriate beautifier based on document type
 def beautify_extracted_text(text: str, blur_text: str, doc_type: str) -> Dict:
     if doc_type == "id_card":
         return beautify_id_card(text, blur_text)
     elif doc_type == "title_deed":
-        print(text)
-        
         return beautify_title_deed(text)
+    elif doc_type == "passport":
+        return beautify_passport(text)
     else:
         return {"raw_text": text}
     
-    # Correct common OCR errors in dates (e.g., interpreting incorrect symbols)
+
+
+
 def correct_date(date_str: str) -> str:
     corrected_date = re.sub(r'[^0-9/]', '', date_str)  # Remove any unexpected characters
     parts = corrected_date.split('/')
@@ -259,6 +259,79 @@ def beautify_title_deed(text: str) -> Dict[str, Union[str, Dict[str, str]]]:
     deed_data["area_sq_feet"] = extract_number(deed_data["area_sq_feet"])
 
     return deed_data
+
+
+
+
+
+
+def beautify_passport(text: str) -> Dict:
+    passport_data = {
+        "full_name": "",
+        "surname": "",
+        "nationality": "",
+        "sex": "",
+        "date_of_birth": "",
+        "passport_number": "",
+        "date_of_issue": "",
+        "date_of_expiry": "",
+        "place_of_issue": "",
+    }
+
+    # Split the text into lines
+    lines = text.splitlines()
+
+    # Parse each line for specific fields
+    for line in lines:
+        line_lower = line.lower().strip()
+
+        if "full name" in line_lower:
+            match = re.search(r'full name\s*[:\s]*(.+)', line, re.IGNORECASE)
+            if match:
+                passport_data["full_name"] = match.group(1).strip()
+
+        if "surname" in line_lower:
+            match = re.search(r'surname\s*[:\s]*(.+)', line, re.IGNORECASE)
+            if match:
+                passport_data["surname"] = match.group(1).strip()
+
+        if "nationality" in line_lower:
+            match = re.search(r'nationality\s*[:\s]*(.+)', line, re.IGNORECASE)
+            if match:
+                passport_data["nationality"] = match.group(1).strip()
+
+        if "sex" in line_lower:
+            match = re.search(r'sex\s*[:\s]*(.+)', line, re.IGNORECASE)
+            if match:
+                passport_data["sex"] = match.group(1).strip()
+
+        if "date of birth" in line_lower or "dob" in line_lower:
+            match = re.search(r'(?:date of birth|dob)\s*[:\s]*(\d{4}-\d{2}-\d{2})', line, re.IGNORECASE)
+            if match:
+                passport_data["date_of_birth"] = match.group(1).strip()
+
+        if "passport number" in line_lower or "passport no" in line_lower:
+            match = re.search(r'(?:passport number|passport no)\s*[:\s]*(\w+)', line, re.IGNORECASE)
+            if match:
+                passport_data["passport_number"] = match.group(1).strip()
+
+        if "date of issue" in line_lower:
+            match = re.search(r'date of issue\s*[:\s]*(\d{4}-\d{2}-\d{2})', line, re.IGNORECASE)
+            if match:
+                passport_data["date_of_issue"] = match.group(1).strip()
+
+        if "date of expiry" in line_lower or "expiry date" in line_lower:
+            match = re.search(r'(?:date of expiry|expiry date)\s*[:\s]*(\d{4}-\d{2}-\d{2})', line, re.IGNORECASE)
+            if match:
+                passport_data["date_of_expiry"] = match.group(1).strip()
+
+        if "place of issue" in line_lower:
+            match = re.search(r'place of issue\s*[:\s]*(.+)', line, re.IGNORECASE)
+            if match:
+                passport_data["place_of_issue"] = match.group(1).strip()
+
+    return passport_data
+
 
 
 

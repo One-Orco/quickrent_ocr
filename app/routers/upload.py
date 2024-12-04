@@ -12,27 +12,26 @@ router = APIRouter()
     summary="Upload and Process a Document for OCR",
     description="""
 This endpoint allows you to upload an image of a document and process it using OCR. 
-It supports both Arabic and English text recognition, applies multiple preprocessing 
-techniques, and returns structured and beautified data depending on the document type.
-
-### Supported `doc_type` Values:
+Supported document types:
 - `id_card`: For processing ID cards.
 - `title_deed`: For processing title deeds.
+- `passport`: For processing passports.
 """,
     response_description="Structured data extracted from the uploaded document."
 )
 async def upload_document(
     file: UploadFile = File(..., description="The image file to process (JPEG, PNG, or TIFF)."),
-    doc_type: Literal["id_card", "title_deed"] = "id_card"  # Restrict valid values
+    doc_type: Literal["id_card", "title_deed", "passport"] = "id_card"
 ) -> Dict:
     """
     Upload an image document for OCR processing.
 
     Parameters:
     - file: The document image to be processed (JPEG, PNG, TIFF).
-    - doc_type: The type of document being uploaded. Valid values:
-        - `id_card`: For ID cards.
-        - `title_deed`: For title deeds.
+    - doc_type: The type of document being uploaded. Supported values:
+        - `id_card`
+        - `title_deed`
+        - `passport`
 
     Returns:
     A structured dictionary containing the extracted and beautified data.
