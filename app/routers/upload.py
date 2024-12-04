@@ -84,8 +84,8 @@ def beautify_extracted_text(text: str, blur_text: str, doc_type: str) -> Dict:
         return {"raw_text": text}
 
 
-# Define the upload document route
-@router.post("/upload-document/")
+# Define the OCR endpoint
+@app.post("/upload-document/")
 async def upload_document(file: UploadFile = File(...), doc_type: str = "id_card") -> Dict:
     if file.content_type not in ["image/jpeg", "image/png", "image/tiff"]:
         raise HTTPException(status_code=400, detail="Unsupported file type. Please upload a JPEG, PNG, or TIFF image.")
