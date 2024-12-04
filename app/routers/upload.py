@@ -7,7 +7,7 @@ import pytesseract
 from typing import Dict, Union
 from collections import Counter
 from app.utils.ocr import preprocess_image, beautify_extracted_text
-from app.utils.beautify import beautify_id_card
+from app.utils.beautify import beautify_id_card,beautify_title_deed
 
 router = APIRouter()
 
@@ -67,54 +67,14 @@ def preprocess_image(image_path: str, mode: str = "default") -> np.ndarray:
     return processed_image
 
 
-# Define a beautify function for license deed
-def beautify_license_deed(text: str) -> Dict[str, Union[str, Dict[str, str]]]:
-    deed_data = {
-        "issue_date": "",
-        "mortgage_status": "",
-        "property_type": "",
-        "community": "",
-        "plot_no": "",
-        "municipality_no": "",
-        "building_no": "",
-        "building_name": "",
-        "property_no": "",
-        "floor_no": "",
-        "parkings": "",
-        "suite_area": "",
-        "balcony_area": "",
-        "area_sq_meter": "",
-        "area_sq_feet": "",
-        "common_area": "",
-        "owners_and_shares": ""
-    }
-
-    # Clean the text
-    clean_text = re.sub(r'[^a-zA-Z0-9/\n\s:-]', '', text)
-    clean_text = re.sub(r' +', ' ', clean_text)
-
-    lines = clean_text.splitlines()
-
-    # Extract the details from text based on some heuristics
-    for line in lines:
-        line_lower = line.lower().strip()
-
-        if "issue date" in line_lower:
-            date_match = re.search(r'\d{2}-\d{2}-\d{4}', line)
-            if date_match:
-                deed_data["issue_date"] = date_match.group(0)
-
-        # Add similar checks for other fields in `deed_data`...
-
-    return deed_data
 
 
 # Beautify extracted text based on document type
 def beautify_extracted_text(text: str, blur_text: str, doc_type: str) -> Dict:
     if doc_type == "id_card":
         return beautify_id_card(text, blur_text)
-    elif doc_type == "license_deed":
-        return beautify_license_deed(text)
+    elif doc_type == "title_deed":
+        return beautify_title_deed(text)
     else:
         return {"raw_text": text}
 
