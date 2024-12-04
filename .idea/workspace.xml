@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="7e8c6d04-0c09-4bb9-8b2e-25effdf3ea60" name="Changes" comment="feat: ocr for id_card added">
       <change beforePath="$PROJECT_DIR$/app/routers/upload.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routers/upload.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/beautify.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/beautify.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/utils/preprocessing.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/preprocessing.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -101,6 +99,7 @@
       <workItem from="1733150988645" duration="11368000" />
       <workItem from="1733324436860" duration="132000" />
       <workItem from="1733331425699" duration="1443000" />
+      <workItem from="1733342280510" duration="324000" />
     </task>
     <task id="LOCAL-00001" summary="feat: ocr for id_card added">
       <option name="closed" value="true" />
