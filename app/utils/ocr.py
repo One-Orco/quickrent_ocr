@@ -2,6 +2,7 @@ import pytesseract
 from app.utils.preprocessing import preprocess_image
 from app.utils.beautify import beautify_extracted_text
 
+pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 def perform_ocr(image_path: str, doc_type: str):
     preprocessing_modes = ["default", "binary", "adaptive", "blur"]
     extracted_texts = {}
