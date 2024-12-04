@@ -6,7 +6,8 @@ import numpy as np
 import pytesseract
 from typing import Dict, Union
 from collections import Counter
-from ..utils import beautify
+from app.utils.ocr import preprocess_image, beautify_extracted_text
+from app.utils.beautify import beautify_id_card
 
 router = APIRouter()
 
