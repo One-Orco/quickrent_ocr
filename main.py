@@ -1,10 +1,9 @@
-import json,re,boto3,io
+import json,re,boto3
 from fastapi import FastAPI, File, UploadFile, HTTPException,Query
 from fastapi.responses import JSONResponse
 from enum import Enum
 from pydantic import BaseModel
 from typing import Optional
-from PyPDF2 import PdfReader
 
 
 
@@ -370,23 +369,13 @@ async def process_document(
     processor = processor_class(QUERY_MAPPING[doc_type])
 
     try:
-        def is_pdf(file: UploadFile):
-            return file.filename.lower().endswith('.pdf')
+        front_file_bytes = await front_file.read()
+        back_file_bytes = await back_file.read() if back_file else None
 
-        if is_pdf(front_file):
-            front_file_bytes = await front_file.read()
-        else:
-            front_file_bytes = await front_file.read()
-
-        back_file_bytes = None
-        if back_file:
-            if is_pdf(back_file):
-                back_file_bytes = await back_file.read()
-            else:
-                back_file_bytes = await back_file.read()
-
+        # Process the front file
         results = processor.process_front(front_file_bytes)
 
+        # Process the back file only for ID cards if provided
         if doc_type == "id_card" and back_file_bytes:
             results = processor.process_back(back_file_bytes, results)
 
