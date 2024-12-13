@@ -1,5 +1,4 @@
-import json
-import boto3
+import json,re,boto3
 from fastapi import FastAPI, File, UploadFile, HTTPException,Query
 from fastapi.responses import JSONResponse
 from enum import Enum
@@ -67,12 +66,19 @@ class IDCardProcessor(DocumentProcessor):
         back_response = textract.detect_document_text(
             Document={'Bytes': back_file_bytes}
         )
+
         mrz_lines = []
+        card_number = None
+
         for block in back_response.get("Blocks", []):
             if block.get("BlockType") == "LINE":
                 text = block.get("Text", "")
                 if text.startswith("IL") or "<<" in text:
                     mrz_lines.append(text)
+
+                match = re.search(r'\b\d{9}\b', text)
+                if match:
+                    card_number = match.group(0)
 
         mrz_text = "\n".join(mrz_lines) if mrz_lines else "Not Available"
         results["mrz"] = mrz_text
@@ -96,8 +102,8 @@ class IDCardProcessor(DocumentProcessor):
             else:
                 results["mrz_validation"] = "Invalid"
 
+        results["card_number"] = card_number if card_number else "Not Available"
         return results
-
 class PassportProcessor(DocumentProcessor):
     MONTH_MAPPING = {
         "JAN": "01", "FEB": "02", "MAR": "03", "APR": "04", "MAY": "05", "JUN": "06",
@@ -116,32 +122,36 @@ class PassportProcessor(DocumentProcessor):
 
     def normalize_mrz_full_name(self, full_name):
 
+        # Split surname and given names
         parts = full_name.split("<<")
         surname = parts[0].replace("<", " ").strip() if len(parts) > 0 else ""
         given_names = parts[1].replace("<", " ").strip() if len(parts) > 1 else ""
 
-        # Combine into a single name
+        # Combine surname and given names into a single name
         normalized_name = f"{surname} {given_names}".strip()
-        return " ".join(normalized_name.split())  
+        # Remove any consecutive spaces
+        return " ".join(normalized_name.split())
+
 
     def parse_mrz(self, mrz):
 
         lines = mrz.splitlines()
         if len(lines) < 2:
-            return None  
+            return None 
 
-        line1 = lines[0]  
-        line2 = lines[1]  
+        line1 = lines[0] 
+        line2 = lines[1] 
 
         parsed = {
-            "passport_number": line2[:9].replace("<", ""), 
-            "nationality": line2[10:13], 
-            "date_of_birth": self.format_date(line2[13:19]),  
-            "gender": line2[20], 
-            "expiration_date": self.format_date(line2[21:27]), 
-            "full_name": self.normalize_mrz_full_name(line1[5:])  
+            "passport_number": line2[:9].replace("<", ""),
+            "nationality": line2[10:13],
+            "date_of_birth": self.format_date(line2[13:19]),
+            "gender": line2[20],
+            "expiration_date": self.format_date(line2[21:27]),
+            "full_name": self.normalize_mrz_full_name(line1[5:])
         }
         return parsed
+
 
     def process_front(self, front_file_bytes):
 
