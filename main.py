@@ -299,9 +299,9 @@ async def process_document(
     front_file: UploadFile = File(...),
     back_file: Optional[UploadFile] = File(None, description="Optional back file for documents like ID cards")
 ):
-    if doc_type == DocumentType.id_card and back_file is not None:
-        results = processor.process_back(back_file_bytes, results)
-
+    # Validate the doc_type and processor
+    if doc_type not in PROCESSORS:
+        raise HTTPException(status_code=400, detail=f"Unsupported document type: {doc_type}")
 
     processor_class = PROCESSORS[doc_type]
     processor = processor_class(QUERY_MAPPING[doc_type])
@@ -310,8 +310,10 @@ async def process_document(
         front_file_bytes = await front_file.read()
         back_file_bytes = await back_file.read() if back_file else None
 
+        # Process the front file
         results = processor.process_front(front_file_bytes)
 
+        # Process the back file only for ID cards if provided
         if doc_type == "id_card" and back_file_bytes:
             results = processor.process_back(back_file_bytes, results)
 
