@@ -299,9 +299,9 @@ async def process_document(
     front_file: UploadFile = File(...),
     back_file: Optional[UploadFile] = File(None, description="Optional back file for documents like ID cards")
 ):
-    # Ensure back_file is not empty when required
-    if doc_type == DocumentType.id_card and back_file is None:
-        raise HTTPException(status_code=400, detail="back_file is required for ID cards")
+    if doc_type == DocumentType.id_card and back_file is not None:
+        results = processor.process_back(back_file_bytes, results)
+
 
     processor_class = PROCESSORS[doc_type]
     processor = processor_class(QUERY_MAPPING[doc_type])
