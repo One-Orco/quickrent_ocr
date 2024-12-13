@@ -320,11 +320,15 @@ QUERY_MAPPING = {
 
     },
     "commercial_license": {
+        "license_title": "what's lisence big title?",
+        "register_no": "what is register no?",
         "license_number": "What is the license number?",
         "business_name": "What is the name of the business?",
         "business_type": "What is the business type?",
         "expiration_date": "What is the expiration date?",
-        "issuing_authority": "Who is the issuing authority?"
+        "issuing_authority": "Who is the issuing authority?",
+        "license_members_name": "what is license member name?",
+        "license_members_role": "what is license member role?"
     }
 }
 
