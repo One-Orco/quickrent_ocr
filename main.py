@@ -17,7 +17,7 @@ class DocumentType(str, Enum):
 
 class DocumentRequest(BaseModel):
     doc_type: DocumentType
-textract = boto3.client('textract')
+textract = boto3.client('textract', region_name='us-east-1') 
 
 class DocumentProcessor:
     def __init__(self, query_mapping):
