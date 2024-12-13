@@ -1,9 +1,10 @@
-import json,re,boto3
+import json,re,boto3,io
 from fastapi import FastAPI, File, UploadFile, HTTPException,Query
 from fastapi.responses import JSONResponse
 from enum import Enum
 from pydantic import BaseModel
 from typing import Optional
+from PyPDF2 import PdfReader
 
 
 
@@ -215,37 +216,60 @@ class PassportProcessor(DocumentProcessor):
 
         return results
 class TitleDeedProcessor(DocumentProcessor):
+    MAX_LANDLORDS = 10
+
     def process_front(self, front_file_bytes):
-        front_response = textract.analyze_document(
-            Document={'Bytes': front_file_bytes},
-            FeatureTypes=["QUERIES"],
-            QueriesConfig={
-                "Queries": [{"Text": question, "Alias": alias} for alias, question in self.query_mapping.items()]
-            }
-        )
+        queries = [{"Text": question, "Alias": alias} for alias, question in self.query_mapping.items()]
+        for i in range(1, self.MAX_LANDLORDS + 1):
+            queries.append({"Text": f"What is owner {i} name?", "Alias": f"owner_{i}_name"})
+            queries.append({"Text": f"What is owner {i} share?", "Alias": f"owner_{i}_share"})
 
-        # with open('title_deed_response.json', 'w') as f:
-        #     json.dump(front_response, f, indent=4)
-
-        query_id_to_text = {
-            block["Id"]: block.get("Text", "Not Available")
-            for block in front_response.get("Blocks", [])
-            if block["BlockType"] == "QUERY_RESULT"
-        }
-
+        query_batches = [queries[i:i + 15] for i in range(0, len(queries), 15)]
         results = {}
-        for block in front_response.get("Blocks", []):
-            if block["BlockType"] == "QUERY" and "Relationships" in block:
-                query_id = block["Id"]
-                alias = block["Query"].get("Alias", block["Query"]["Text"])
-                for relationship in block["Relationships"]:
-                    if relationship["Type"] == "ANSWER":
-                        for answer_id in relationship["Ids"]:
-                            results[alias] = query_id_to_text.get(answer_id, "Not Available")
 
+        for batch in query_batches:
+            front_response = textract.analyze_document(
+                Document={'Bytes': front_file_bytes},
+                FeatureTypes=["QUERIES"],
+                QueriesConfig={"Queries": batch}
+            )
+
+            query_id_to_text = {
+                block["Id"]: block.get("Text", "Not Available")
+                for block in front_response.get("Blocks", [])
+                if block["BlockType"] == "QUERY_RESULT"
+            }
+
+            for block in front_response.get("Blocks", []):
+                if block["BlockType"] == "QUERY" and "Relationships" in block:
+                    query_id = block["Id"]
+                    alias = block["Query"].get("Alias", block["Query"]["Text"])
+                    for relationship in block["Relationships"]:
+                        if relationship["Type"] == "ANSWER":
+                            for answer_id in relationship["Ids"]:
+                                results[alias] = query_id_to_text.get(answer_id, "Not Available")
+
+        landlords = []
+        for i in range(1, self.MAX_LANDLORDS + 1):
+            name = results.pop(f"owner_{i}_name", None)
+            share = results.pop(f"owner_{i}_share", None)
+            if name and name != "Not Available" and share and share != "Not Available":
+                landlords.append({"name": name.strip(), "share": share.strip()})
+
+        landlords = self.remove_duplicates(landlords)
+        results["landlords"] = landlords
         return results
 
-
+    @staticmethod
+    def remove_duplicates(landlords):
+        seen = set()
+        unique_landlords = []
+        for landlord in landlords:
+            identifier = (landlord["name"], landlord["share"])
+            if identifier not in seen:
+                seen.add(identifier)
+                unique_landlords.append(landlord)
+        return unique_landlords
 
 class CommercialLicenseProcessor(DocumentProcessor):
     def process_front(self, front_file_bytes):
@@ -316,7 +340,7 @@ QUERY_MAPPING = {
         "municipality_no": "what is Municipality No?",
         "suite_area": "what is suite area?",
         "total_area_feat": "what is total area feat?",
-        "common_area": "what is common area?"
+        "common_area": "what is common area?",
 
     },
     "commercial_license": {
@@ -346,13 +370,23 @@ async def process_document(
     processor = processor_class(QUERY_MAPPING[doc_type])
 
     try:
-        front_file_bytes = await front_file.read()
-        back_file_bytes = await back_file.read() if back_file else None
+        def is_pdf(file: UploadFile):
+            return file.filename.lower().endswith('.pdf')
 
-        # Process the front file
+        if is_pdf(front_file):
+            front_file_bytes = await front_file.read()
+        else:
+            front_file_bytes = await front_file.read()
+
+        back_file_bytes = None
+        if back_file:
+            if is_pdf(back_file):
+                back_file_bytes = await back_file.read()
+            else:
+                back_file_bytes = await back_file.read()
+
         results = processor.process_front(front_file_bytes)
 
-        # Process the back file only for ID cards if provided
         if doc_type == "id_card" and back_file_bytes:
             results = processor.process_back(back_file_bytes, results)
 
