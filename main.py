@@ -312,7 +312,11 @@ QUERY_MAPPING = {
         "plot_no": "what is plot no?",
         "parkings": "what is parkings?",
         "area_square_meter": "what is area meter?",
-        "balcony_area": "what is balcony area?"
+        "balcony_area": "what is balcony area?",
+        "municipality_no": "what is Municipality No?",
+        "suite_area": "what is suite area?",
+        "total_area_feat": "what is total area feat?",
+        "common_area": "what is common area?"
 
     },
     "commercial_license": {
