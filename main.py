@@ -105,48 +105,46 @@ class PassportProcessor(DocumentProcessor):
     }
 
     def normalize_date(self, date):
-        """
-        Converts dates like '11 OCT 1971' to '11/10/1971'.
-        """
+
         parts = date.split()
         if len(parts) == 3:
             day, month, year = parts
             month = self.MONTH_MAPPING.get(month.upper(), "Invalid")
             if month != "Invalid":
                 return f"{day}/{month}/{year}"
-        return date  # Return original date if formatting fails
+        return date 
 
-    def normalize_full_name(self, full_name):
-        """
-        Removes extra spaces in the full_name field.
-        """
-        return " ".join(full_name.split())
+    def normalize_mrz_full_name(self, full_name):
+
+        parts = full_name.split("<<")
+        surname = parts[0].replace("<", " ").strip() if len(parts) > 0 else ""
+        given_names = parts[1].replace("<", " ").strip() if len(parts) > 1 else ""
+
+        # Combine into a single name
+        normalized_name = f"{surname} {given_names}".strip()
+        return " ".join(normalized_name.split())  
 
     def parse_mrz(self, mrz):
-        """
-        Parses the MRZ (Machine Readable Zone) from the passport.
-        """
+
         lines = mrz.splitlines()
         if len(lines) < 2:
-            return None  # Ensure there are at least two lines for valid MRZ
+            return None  
 
-        line1 = lines[0]  # First line of the MRZ
-        line2 = lines[1]  # Second line of the MRZ
+        line1 = lines[0]  
+        line2 = lines[1]  
 
         parsed = {
-            "passport_number": line2[:9].replace("<", ""),  # Passport Number
-            "nationality": line2[10:13],  # Nationality Code
-            "date_of_birth": self.format_date(line2[13:19]),  # Date of Birth (YYMMDD)
-            "gender": line2[20],  # Gender
-            "expiration_date": self.format_date(line2[21:27]),  # Expiry Date (YYMMDD)
-            "full_name": self.normalize_full_name(line1[5:].replace("<", " "))  # Cleaned Name
+            "passport_number": line2[:9].replace("<", ""), 
+            "nationality": line2[10:13], 
+            "date_of_birth": self.format_date(line2[13:19]),  
+            "gender": line2[20], 
+            "expiration_date": self.format_date(line2[21:27]), 
+            "full_name": self.normalize_mrz_full_name(line1[5:])  
         }
         return parsed
 
     def process_front(self, front_file_bytes):
-        """
-        Processes the front of the passport, including OCR and MRZ data extraction.
-        """
+
         front_response = textract.analyze_document(
             Document={'Bytes': front_file_bytes},
             FeatureTypes=["QUERIES"],
@@ -190,10 +188,8 @@ class PassportProcessor(DocumentProcessor):
                     "mrz_gender": mrz_data["gender"],
                     "mrz_full_name": mrz_data["full_name"]
                 })
-                # Normalize OCR dates
                 results["ocr_date_of_birth"] = self.normalize_date(results.get("date_of_birth", "Not Available"))
                 results["ocr_date_of_expiry"] = self.normalize_date(results.get("date_of_expiry", "Not Available"))
-                # Validate OCR data against MRZ data
                 results["date_of_birth_validation"] = (
                     "Valid" if results["ocr_date_of_birth"] == mrz_data["date_of_birth"] else "Mismatch"
                 )
@@ -208,91 +204,6 @@ class PassportProcessor(DocumentProcessor):
                 results["mrz_validation"] = "Invalid"
 
         return results
-
-    def parse_mrz(self, mrz):
-
-        lines = mrz.splitlines()
-        if len(lines) < 2:
-            return None  
-
-        line1 = lines[0] 
-        line2 = lines[1]  
-
-        parsed = {
-            "passport_number": line2[:9].replace("<", ""),  
-            "nationality": line2[10:13],  
-            "date_of_birth": self.format_date(line2[13:19]),  
-            "gender": line2[20],
-            "expiration_date": self.format_date(line2[21:27]),  
-            "full_name": line1[5:].replace("<", " ").strip()  
-        }
-        return parsed
-
-    def process_front(self, front_file_bytes):
-
-        front_response = textract.analyze_document(
-            Document={'Bytes': front_file_bytes},
-            FeatureTypes=["QUERIES"],
-            QueriesConfig={"Queries": [{"Text": question, "Alias": alias} for alias, question in self.query_mapping.items()]}
-        )
-
-        
-        query_id_to_text = {
-            block["Id"]: block.get("Text", "Not Available")
-            for block in front_response.get("Blocks", [])
-            if block["BlockType"] == "QUERY_RESULT"
-        }
-
-        
-        results = {}
-        for block in front_response.get("Blocks", []):
-            if block["BlockType"] == "QUERY" and "Relationships" in block:
-                query_id = block["Id"]
-                alias = block["Query"].get("Alias", block["Query"]["Text"])
-                for relationship in block["Relationships"]:
-                    if relationship["Type"] == "ANSWER":
-                        for answer_id in relationship["Ids"]:
-                            results[alias] = query_id_to_text.get(answer_id, "Not Available")
-
-        mrz_lines = []
-        for block in front_response.get("Blocks", []):
-            if block.get("BlockType") == "LINE":
-                text = block.get("Text", "")
-                if text.startswith("P<") or "<<" in text:  
-                    mrz_lines.append(text)
-
-        mrz_text = "\n".join(mrz_lines) if mrz_lines else "Not Available"
-        results["mrz"] = mrz_text
-
-        if mrz_text != "Not Available" and len(mrz_lines) >= 2:
-            mrz_data = self.parse_mrz(mrz_text)
-            if mrz_data:
-                results["full_name"] = mrz_data["full_name"]
-                results.update({
-                    "mrz_passport_number": mrz_data["passport_number"],
-                    "mrz_date_of_birth": mrz_data["date_of_birth"],
-                    "mrz_expiration_date": mrz_data["expiration_date"],
-                    "mrz_gender": mrz_data["gender"],
-                    "mrz_full_name": mrz_data["full_name"]
-                })
-                results["date_of_birth_validation"] = (
-                    "Valid" if results.get("date_of_birth") == mrz_data["date_of_birth"] else "Mismatch"
-                )
-                results["expiration_date_validation"] = (
-                    "Valid" if results.get("date_of_expiry") == mrz_data["expiration_date"] else "Mismatch"
-                )
-                if results["date_of_birth_validation"] == "Mismatch":
-                    results["ocr_date_of_birth"] = results.get("date_of_birth", "Not Available")
-                    results["mrz_date_of_birth_value"] = mrz_data["date_of_birth"]
-                if results["expiration_date_validation"] == "Mismatch":
-                    results["ocr_date_of_expiry"] = results.get("date_of_expiry", "Not Available")
-                    results["mrz_expiration_date_value"] = mrz_data["expiration_date"]
-            else:
-                results["mrz_validation"] = "Invalid"
-
-        return results
-
-
 class TitleDeedProcessor(DocumentProcessor):
     def process_front(self, front_file_bytes):
         front_response = textract.analyze_document(
